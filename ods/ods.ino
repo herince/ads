@@ -46,6 +46,40 @@ void ReadCompass() {
   compassState.Z /= SENSOR_READS_COUNT;
 }
 
+double GetSize(const double v[3]) {
+  return sqrt(pow(v[0], 2) + pow(v[1], 2) + pow(v[2], 2));
+}
+
+double GetDotProduct(const double u[3], const double v[3]) {
+  return u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+}
+
+void GetCrossProduct(const double u[3], const double v[3], double result[3]) {
+  result[0] = u[1] * v[2] - u[2] * v[1];
+  result[1] = u[2] * v[0] - u[0] * v[2];
+  result[2] = u[0] * v[1] - u[1] * v[0];
+}
+
+double GetAngleBetweenVectors(const double u[3], const double v[3]) {
+  double uv = GetDotProduct(u, v);
+  return acos(uv / (GetSize(u) * GetSize(v)));
+}
+
+void GetNormalVector(const double v[3], double n[3]) {
+  double s = GetSize(v);
+  for (int i = 0; i < 3; i++) {
+    n[i] = v[i] / s;
+  }
+}
+
+void GetQuaternion(const double angle, const double v[3], double q[4]) {
+  q[0] = cos(angle);
+  q[1] = sin(angle) * v[0];
+  q[2] = sin(angle) * v[1];
+  q[3] = sin(angle) * v[2];
+}
+
+
 void setup() {
   // Set data rate
   Serial.begin(9600);
@@ -71,32 +105,31 @@ void loop() {
 
   // Ideally, here I would use actual or realistically simulated satellite-Sun and Earth's magnetic field vectors
   // in a J2000 geocentric inertial coordinate system. However, I don't have time to figure out
-  // how to this well at the moment so I'm using example normalized values from a random Free Flyer simulation
-  double Sj[3] = {-0.73354462, -0.6235704, -0.270318785};
-  double Bj[3] = {-0.685559737, -0.450165898, -0.572152524};
+  // how to this well at the moment so I'm using example values from a random Free Flyer simulation
+  const double Sj[] = { -108808633.975990430,    -92495864.030892253,    -40097107.864750557};
+  const double Bj[] = { -4641.587316625,    -3047.851571220,    -3873.762932595};
 
   // Calculate normal satellite-Sun vector
   double sunSensorX = double(sensors[0].Value - sensors[3].Value);
   double sunSensorY = double(sensors[1].Value - sensors[4].Value);
   double sunSensorZ = double(sensors[2].Value - sensors[5].Value);
   double Ss[3] = {sunSensorX, sunSensorY, sunSensorZ};
-  double SsMagnitude = sqrt(Ss[0] * Ss[0] + Ss[1] * Ss[1] + Ss[2] * Ss[2]);
-  Ss[0] /= SsMagnitude;
-  Ss[1] /= SsMagnitude;
-  Ss[2] /= SsMagnitude;
 
   // Calculate normal vector for the Earth's magnetic field with coordinates related to the satellite
   double Bs[3] = {double(compassState.X), double(compassState.Y), double(compassState.Z)};
-  double BsMagnitude = sqrt(Bs[0] * Bs[0] + Bs[1] * Bs[1] + Bs[2] * Bs[2]);
-  Bs[0] /= BsMagnitude;
-  Bs[1] /= BsMagnitude;
-  Bs[2] /= BsMagnitude;
 
   // Align Bj and Bs
-  // TODO
+  double n[3];
+  GetCrossProduct(Bj, Bs, n);
+  GetNormalVector(n, n);
+  double alpha = GetAngleBetweenVectors(Bs, Bj);
+
+  // First quaternion of rotation
+  double q1[4];
+  GetQuaternion(alpha / 2, n, q1);
 
   // Align Sj and Ss
   // TODO
-  
+
   delay(250);
 }
