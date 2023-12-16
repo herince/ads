@@ -79,6 +79,30 @@ void GetQuaternion(const double angle, const double v[3], double q[4]) {
   q[3] = sin(angle) * v[2];
 }
 
+void RotateVector(const double m[3][3], const double v[3], double result[3]) {
+  for (int i = 0; i < 3; i++) {
+    result[i] = 0;
+    for (int j = 0; j < 3; j++) {
+      result[i] += m[i][j] * v[j];
+    }
+  }
+}
+
+void CalculateRotationMatrix(const double q[4], double m[3][3]) {
+  double rotationMatrix[3][3] = {
+    {1 - 2 * pow(q[2], 2) - 2 * pow(q[3], 2), 2 * (q[1] * q[2] + q[0] * q[3]), 2 * (q[1] * q[3] - q[0] * q[2])},
+    {2 * (q[1] * q[2] - q[0] * q[3]), 1 - 2 * pow(q[1], 2) - 2 * pow(q[3], 2), 2 * (q[2] * q[3] + q[0] * q[1])},
+    {2 * (q[1] * q[3] + q[0] * q[2]) , 2 * (q[2] * q[3] - q[0] * q[1]) , 1 - 2 * pow(q[1], 2) - 2 * pow(q[2], 2)}
+  };
+  m = rotationMatrix;
+}
+
+void MultiplyQuaternions(const double q1[4], const double q2[4], double q[4]) {
+  q[0] = q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] - q1[3] * q2[3];
+  q[1] = q1[1] * q2[0] + q1[0] * q2[1] - q1[3] * q2[2] + q1[2] * q2[3];
+  q[2] = q1[2] * q2[0] + q1[3] * q2[1] + q1[0] * q2[2] - q1[1] * q2[3];
+  q[3] = q1[3] * q2[0] - q1[2] * q2[1] + q1[1] * q2[2] + q1[0] * q2[3];
+}
 
 void setup() {
   // Set data rate
@@ -107,7 +131,7 @@ void loop() {
   // in a J2000 geocentric inertial coordinate system. However, I don't have time to figure out
   // how to this well at the moment so I'm using example values from a random Free Flyer simulation
   const double Sj[] = { -108808633.975990430,    -92495864.030892253,    -40097107.864750557};
-  const double Bj[] = { -4641.587316625,    -3047.851571220,    -3873.762932595};
+  const double Bj[] = { -4641.587316625,    -3047.851571220,    -3873.762932595}; // TODO: Do these vectors need to be normalized ???
 
   // Calculate normal satellite-Sun vector
   double sunSensorX = double(sensors[0].Value - sensors[3].Value);
@@ -128,8 +152,21 @@ void loop() {
   double q1[4];
   GetQuaternion(alpha / 2, n, q1);
 
-  // Align Sj and Ss
-  // TODO
+  // Rotate Ss
+  double q1RotationMatrix[3][3];
+  CalculateRotationMatrix(q1, q1RotationMatrix);
+  double SsPrim[3];
+  RotateVector(q1RotationMatrix, Ss, SsPrim);
+
+  // TODO: Find the rotation angle to rotate SsPrim aroung the axis defined by Bj
+  double q2[4];
+  GetQuaternion(alpha / 2, Bj, q2);
+
+  double finalRotationQuaternion[4];
+  MultiplyQuaternions(q1, q2, finalRotationQuaternion);
+
+  // TODO: verify that the calculations are correct
+  // TODO [bonus]: visualize the rotation
 
   delay(250);
 }
