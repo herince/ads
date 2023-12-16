@@ -180,6 +180,12 @@ void loop() {
   double result = GetDotProduct(crossProdSsBj, Sj);
   assert(result < EXPECTED_RESULT_EPSILON);
 
+  double rBs[3];
+  RotateVector(qRotationMatrix, Bs, rBs);
+  for (int i = 0; i < 3; i++) {
+    assert(Bj[i] - rBs[i] < EXPECTED_RESULT_EPSILON);
+  }
+
   // TODO [bonus]: visualize the rotation
 
   delay(250);
