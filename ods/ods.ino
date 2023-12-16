@@ -1,4 +1,5 @@
 #include <math.h>
+#include <assert.h>
 #include <QMC5883LCompass.h>
 
 struct t_SunSensor {
@@ -20,6 +21,7 @@ t_SunSensor sensors[6];
 int sensorsSize = sizeof(sensors) / sizeof(t_SunSensor);
 
 const int SENSOR_READS_COUNT = 150;
+const double EXPECTED_RESULT_EPSILON = 0.001;
 
 void ReadSunSensors() {
   for (int i = 0; i < SENSOR_READS_COUNT; i++) {
@@ -130,17 +132,21 @@ void loop() {
   // Ideally, here I would use actual or realistically simulated satellite-Sun and Earth's magnetic field vectors
   // in a J2000 geocentric inertial coordinate system. However, I don't have time to figure out
   // how to this well at the moment so I'm using example values from a random Free Flyer simulation
-  const double Sj[] = { -108808633.975990430,    -92495864.030892253,    -40097107.864750557};
-  const double Bj[] = { -4641.587316625,    -3047.851571220,    -3873.762932595}; // TODO: Do these vectors need to be normalized ???
+  double Sj[] = { -108808633.975990430, -92495864.030892253, -40097107.864750557};
+  double Bj[] = { -4641.587316625, -3047.851571220, -3873.762932595};
+  GetNormalVector(Sj, Sj);
+  GetNormalVector(Bj, Bj);
 
   // Calculate normal satellite-Sun vector
   double sunSensorX = double(sensors[0].Value - sensors[3].Value);
   double sunSensorY = double(sensors[1].Value - sensors[4].Value);
   double sunSensorZ = double(sensors[2].Value - sensors[5].Value);
   double Ss[3] = {sunSensorX, sunSensorY, sunSensorZ};
+  GetNormalVector(Ss, Ss);
 
   // Calculate normal vector for the Earth's magnetic field with coordinates related to the satellite
   double Bs[3] = {double(compassState.X), double(compassState.Y), double(compassState.Z)};
+  GetNormalVector(Bs, Bs);
 
   // Align Bj and Bs
   double n[3];
@@ -158,14 +164,22 @@ void loop() {
   double SsPrim[3];
   RotateVector(q1RotationMatrix, Ss, SsPrim);
 
-  // TODO: Find the rotation angle to rotate SsPrim aroung the axis defined by Bj
   double q2[4];
   GetQuaternion(alpha / 2, Bj, q2);
 
   double finalRotationQuaternion[4];
   MultiplyQuaternions(q1, q2, finalRotationQuaternion);
 
-  // TODO: verify that the calculations are correct
+  // Verify that the calculations are correct
+  double qRotationMatrix[3][3];
+  CalculateRotationMatrix(finalRotationQuaternion, qRotationMatrix);
+  double rSs[3];
+  RotateVector(qRotationMatrix, Ss, rSs);
+  double crossProdSsBj[3];
+  GetCrossProduct(rSs, Bj, crossProdSsBj);
+  double result = GetDotProduct(crossProdSsBj, Sj);
+  assert(result < EXPECTED_RESULT_EPSILON);
+
   // TODO [bonus]: visualize the rotation
 
   delay(250);
